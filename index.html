@@ -3,55 +3,171 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>جستجوی سانس خالی سالن‌های ورزشی</title>
+<meta name="theme-color" content="#071c12">
+<title>سانس خالی سالن‌های ورزشی</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='12' fill='%23071c12'/%3E%3Ccircle cx='12' cy='12' r='7' fill='none' stroke='%23f5a623' stroke-width='1.6'/%3E%3Cpath d='M12 7.5l3.1 2.2-1.2 3.6h-3.8l-1.2-3.6z' fill='%23f5a623'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl/dist/maplibre-gl.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<svg class="icon-defs" aria-hidden="true">
+  <symbol id="icon-ball" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="9"/>
+    <path d="M12 7.5l3.6 2.6-1.4 4.2H9.8l-1.4-4.2z"/>
+    <path d="M12 7.5V4.3M15.6 10.1l3-1.7M13.6 14.3l1.8 3.1M8.4 14.3l-1.8 3.1M8.4 10.1l-3-1.7"/>
+  </symbol>
+  <symbol id="icon-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+    <circle cx="11" cy="11" r="6"/>
+    <line x1="20" y1="20" x2="15.5" y2="15.5"/>
+  </symbol>
+  <symbol id="icon-star" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M12 3.5l2.6 5.4 5.9.7-4.3 4.1 1.1 5.9L12 16.7l-5.3 2.9 1.1-5.9-4.3-4.1 5.9-.7z"/>
+  </symbol>
+  <symbol id="icon-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 3.5 21.5 20h-19z"/>
+    <line x1="12" y1="9.5" x2="12" y2="14"/>
+    <circle cx="12" cy="17" r="0.6" fill="currentColor"/>
+  </symbol>
+  <symbol id="icon-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 21s7-7.5 7-12a7 7 0 1 0-14 0c0 4.5 7 12 7 12z"/>
+    <circle cx="12" cy="9" r="2.3"/>
+  </symbol>
+  <symbol id="icon-target" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+    <circle cx="12" cy="12" r="6.5"/>
+    <circle cx="12" cy="12" r="1.2" fill="currentColor"/>
+    <path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4"/>
+  </symbol>
+  <symbol id="icon-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+    <path d="M6 6l12 12M18 6 6 18"/>
+  </symbol>
+  <symbol id="icon-link" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/>
+    <path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>
+  </symbol>
+  <symbol id="icon-origin" viewBox="0 0 24 24">
+    <path d="M12 22.5s7.5-7.4 7.5-13.2A7.5 7.5 0 0 0 4.5 9.3C4.5 15.1 12 22.5 12 22.5z" fill="currentColor" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/>
+    <circle cx="12" cy="9.3" r="2.9" fill="#fff"/>
+  </symbol>
+  <symbol id="icon-external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M14 4h6v6"/>
+    <path d="M20 4 10 14"/>
+    <path d="M18 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5"/>
+  </symbol>
+  <symbol id="icon-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3.5" y="5" width="17" height="15" rx="2.5"/>
+    <line x1="3.5" y1="9.5" x2="20.5" y2="9.5"/>
+    <line x1="7.5" y1="3" x2="7.5" y2="6.5"/>
+    <line x1="16.5" y1="3" x2="16.5" y2="6.5"/>
+  </symbol>
+  <symbol id="icon-chevron-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M14 6l-6 6 6 6"/>
+  </symbol>
+  <symbol id="icon-chevron-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M10 6l6 6-6 6"/>
+  </symbol>
+</svg>
+
 <div id="app">
   <header class="topbar">
-    <h1>سانس خالی سالن‌های ورزشی</h1>
-    <p class="subtitle">روی نقشه، فقط مجموعه‌هایی که سانس خالی مطابق فیلتر شما دارند نشان داده می‌شود</p>
+    <div class="brand">
+      <span class="brand-mark"><svg><use href="#icon-ball"/></svg></span>
+      <div class="brand-text">
+        <h1>سانس خالی سالن‌های ورزشی</h1>
+        <p class="subtitle">روی نقشه، فقط مجموعه‌هایی که سانس خالی مطابق فیلتر شما دارند نشان داده می‌شود</p>
+      </div>
+    </div>
   </header>
 
   <form id="filters" class="filters">
-    <div class="field">
-      <label for="category">نوع مجموعه</label>
-      <select id="category" required></select>
+    <div class="filter-group">
+      <div class="field">
+        <label for="category">نوع مجموعه</label>
+        <select id="category" required></select>
+      </div>
+      <div class="field">
+        <label for="state">شهر</label>
+        <select id="state" required></select>
+      </div>
+      <div class="field">
+        <label for="district">منطقه</label>
+        <select id="district">
+          <option value="">همه مناطق</option>
+        </select>
+      </div>
     </div>
-    <div class="field">
-      <label for="state">شهر</label>
-      <select id="state" required></select>
+    <div class="filter-group filter-group-when">
+      <div class="field field-date">
+        <span id="dateLabel" class="field-label-text">تاریخ</span>
+        <button type="button" id="dateTrigger" class="date-trigger" aria-haspopup="dialog" aria-expanded="false">
+          <svg><use href="#icon-calendar"/></svg>
+          <span id="dateTriggerLabel"></span>
+        </button>
+        <div id="datePopover" class="date-popover" hidden role="dialog" aria-label="انتخاب تاریخ" aria-labelledby="dateLabel">
+          <div class="date-popover-quick">
+            <button type="button" class="quick-chip" data-offset="0">امروز</button>
+            <button type="button" class="quick-chip" data-offset="1">فردا</button>
+          </div>
+          <div class="cal-header">
+            <button type="button" id="calPrev" class="cal-nav" aria-label="ماه قبل"><svg><use href="#icon-chevron-right"/></svg></button>
+            <span id="calMonthLabel" class="cal-month-label"></span>
+            <button type="button" id="calNext" class="cal-nav" aria-label="ماه بعد"><svg><use href="#icon-chevron-left"/></svg></button>
+          </div>
+          <div class="cal-weekdays">
+            <span>ش</span><span>ی</span><span>د</span><span>س</span><span>چ</span><span>پ</span><span>ج</span>
+          </div>
+          <div class="cal-grid" id="calGrid"></div>
+        </div>
+      </div>
+      <div class="field field-time">
+        <label for="fromTime">از ساعت</label>
+        <select id="fromTime" required></select>
+      </div>
+      <div class="field field-time">
+        <label for="toTime">تا ساعت</label>
+        <select id="toTime" required></select>
+      </div>
     </div>
-    <div class="field">
-      <label for="district">منطقه</label>
-      <select id="district">
-        <option value="">همه مناطق</option>
-      </select>
-    </div>
-    <div class="field">
-      <label for="date">تاریخ</label>
-      <input type="date" id="date" required>
-    </div>
-    <div class="field">
-      <label for="fromTime">از ساعت</label>
-      <input type="time" id="fromTime" value="08:00" required>
-    </div>
-    <div class="field">
-      <label for="toTime">تا ساعت</label>
-      <input type="time" id="toTime" value="23:00" required>
-    </div>
-    <button type="submit" id="searchBtn">جستجو</button>
+    <button type="submit" id="searchBtn" class="search-btn">
+      <svg><use href="#icon-search"/></svg>
+      <span>جستجو</span>
+    </button>
   </form>
 
-  <div id="status" class="status" hidden></div>
+  <div id="status" class="status" hidden aria-live="polite">
+    <span id="statusText"></span>
+    <div id="locationActions" class="status-actions" hidden>
+      <button type="button" id="sortDistanceBtn" class="pill-toggle">
+        <svg><use href="#icon-pin"/></svg>
+        <span>نزدیک‌ترین به من</span>
+      </button>
+      <button type="button" id="pickLocationBtn" class="pill-toggle" aria-pressed="false">
+        <svg><use href="#icon-target"/></svg>
+        <span>انتخاب روی نقشه</span>
+      </button>
+      <button type="button" id="clearLocationBtn" class="pill-toggle pill-icon" aria-label="حذف مکان انتخابی" title="حذف مکان انتخابی" hidden>
+        <svg><use href="#icon-close"/></svg>
+      </button>
+      <button type="button" id="copyLinkBtn" class="pill-toggle">
+        <svg><use href="#icon-link"/></svg>
+        <span>کپی لینک</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="pitch-divider" aria-hidden="true"></div>
 
   <main class="results">
-    <div id="map"></div>
+    <div class="map-wrap">
+      <div id="map"></div>
+      <div id="pickHint" class="pick-hint" hidden role="status"></div>
+    </div>
     <aside id="list" class="list">
-      <p class="list-empty">برای دیدن نتایج، فیلترها را تنظیم و جستجو کنید.</p>
+      <div class="state-panel">
+        <svg class="state-icon"><use href="#icon-ball"/></svg>
+        <p>فیلترها را تنظیم کنید و جستجو بزنید تا سانس‌های خالی روی نقشه دیده شوند.</p>
+      </div>
     </aside>
   </main>
 </div>
