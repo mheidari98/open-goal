@@ -7,11 +7,14 @@
   --chalk-500: #9fb3a4;
   --floodlight-400: #f5a623;
   --floodlight-300: #ffc35c;
-  --pitch-400: #4caf6d;
   --danger: #ef5b57;
   --radius-card: 14px;
   --radius-pill: 999px;
   --radius-chip: 8px;
+  --radius-field: 10px;
+  --line: rgba(244, 247, 241, 0.06);
+  --edge-amber: rgba(245, 166, 35, 0.35);
+  --on-amber: #201400;
   --shadow-card: 0 10px 24px -12px rgba(3, 15, 8, 0.65);
 }
 
@@ -30,8 +33,6 @@ html, body {
 }
 
 .icon-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
-
-svg use { color: inherit; }
 
 #app {
   display: flex;
@@ -63,7 +64,7 @@ svg use { color: inherit; }
   align-items: center;
   justify-content: center;
   background: var(--field-800);
-  border: 1px solid rgba(245, 166, 35, 0.35);
+  border: 1px solid var(--edge-amber);
   color: var(--floodlight-400);
 }
 
@@ -92,7 +93,7 @@ svg use { color: inherit; }
   margin: 0 22px 14px;
   padding: 14px 16px;
   background: var(--field-800);
-  border: 1px solid rgba(244, 247, 241, 0.06);
+  border: 1px solid var(--line);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-card);
 }
@@ -105,7 +106,7 @@ svg use { color: inherit; }
   border-inline-end: 1px dashed rgba(159, 179, 164, 0.25);
 }
 
-.filter-group:last-of-type {
+.filter-group-when {
   border-inline-end: none;
   padding-inline-end: 0;
 }
@@ -127,21 +128,16 @@ svg use { color: inherit; }
   color: var(--chalk-500);
 }
 
-select {
+select, .date-trigger {
   background: var(--field-700);
   border: 1px solid rgba(244, 247, 241, 0.08);
   color: var(--chalk-100);
-  border-radius: 10px;
-  padding: 9px 11px;
+  border-radius: var(--radius-field);
   font-family: inherit;
   font-size: 13.5px;
 }
 
-select:focus {
-  outline: none;
-  border-color: var(--floodlight-400);
-  box-shadow: 0 0 0 3px rgba(245, 166, 35, 0.22);
-}
+select { padding: 9px 11px; }
 
 /* ---------- date trigger + calendar popover ---------- */
 
@@ -149,13 +145,7 @@ select:focus {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: var(--field-700);
-  border: 1px solid rgba(244, 247, 241, 0.08);
-  color: var(--chalk-100);
-  border-radius: 10px;
   padding: 9px 12px;
-  font-family: inherit;
-  font-size: 13.5px;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
@@ -163,12 +153,14 @@ select:focus {
 
 .date-trigger svg { width: 16px; height: 16px; color: var(--floodlight-400); flex-shrink: 0; }
 
-.date-trigger:hover { border-color: rgba(245, 166, 35, 0.35); }
+.date-trigger:hover { border-color: var(--edge-amber); }
 
-.date-trigger[aria-expanded="true"] {
+select:focus, .date-trigger[aria-expanded="true"] {
   border-color: var(--floodlight-400);
   box-shadow: 0 0 0 3px rgba(245, 166, 35, 0.22);
 }
+
+select:focus { outline: none; }
 
 .date-popover {
   position: absolute;
@@ -202,7 +194,7 @@ select:focus {
   cursor: pointer;
 }
 
-.quick-chip:hover { border-color: rgba(245, 166, 35, 0.35); }
+.quick-chip:hover { border-color: var(--edge-amber); }
 
 .cal-header {
   display: flex;
@@ -224,7 +216,7 @@ select:focus {
   background: transparent;
   border: none;
   color: var(--chalk-500);
-  border-radius: 8px;
+  border-radius: var(--radius-chip);
   cursor: pointer;
 }
 
@@ -259,20 +251,20 @@ select:focus {
   background: transparent;
   border: 1px solid transparent;
   color: var(--chalk-100);
-  border-radius: 8px;
+  border-radius: var(--radius-chip);
   font-family: inherit;
   font-size: 12.5px;
   font-variant-numeric: tabular-nums;
   cursor: pointer;
 }
 
-.cal-day:hover:not(:disabled) { border-color: rgba(245, 166, 35, 0.35); }
+.cal-day:hover:not(:disabled) { border-color: var(--edge-amber); }
 
 .cal-day.today { color: var(--floodlight-300); font-weight: 700; }
 
 .cal-day.selected {
   background: var(--floodlight-400);
-  color: #201400;
+  color: var(--on-amber);
   font-weight: 700;
 }
 
@@ -288,7 +280,7 @@ select:focus {
   align-self: flex-end;
   margin-inline-start: auto;
   background: linear-gradient(180deg, var(--floodlight-300), var(--floodlight-400));
-  color: #201400;
+  color: var(--on-amber);
   border: none;
   border-radius: var(--radius-pill);
   padding: 11px 24px;
@@ -314,8 +306,8 @@ select:focus {
   font-size: 13px;
   color: var(--chalk-500);
   background: var(--field-800);
-  border: 1px solid rgba(244, 247, 241, 0.06);
-  border-radius: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-field);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -398,7 +390,7 @@ select:focus {
   margin: 0 22px 22px;
   border-radius: var(--radius-card);
   overflow: hidden;
-  border: 1px solid rgba(244, 247, 241, 0.06);
+  border: 1px solid var(--line);
 }
 
 .map-wrap {
@@ -436,7 +428,7 @@ select:focus {
   flex-shrink: 0;
   overflow-y: auto;
   background: var(--field-800);
-  border-inline-start: 1px solid rgba(244, 247, 241, 0.06);
+  border-inline-start: 1px solid var(--line);
   padding: 12px;
 }
 
@@ -468,7 +460,7 @@ select:focus {
 
 .venue-card {
   background: var(--field-700);
-  border: 1px solid rgba(244, 247, 241, 0.06);
+  border: 1px solid var(--line);
   border-radius: var(--radius-card);
   padding: 13px;
   margin-bottom: 10px;
@@ -497,7 +489,7 @@ select:focus {
   flex-shrink: 0;
   width: 40px;
   height: 40px;
-  border-radius: 10px;
+  border-radius: var(--radius-field);
   background: var(--field-650);
   display: flex;
   align-items: center;
@@ -560,7 +552,7 @@ select:focus {
   align-items: center;
   gap: 1px;
   background: rgba(245, 166, 35, 0.1);
-  border: 1px solid rgba(245, 166, 35, 0.35);
+  border: 1px solid var(--edge-amber);
   border-radius: var(--radius-chip);
   padding: 4px 8px;
   font-variant-numeric: tabular-nums;
@@ -578,23 +570,23 @@ select:focus {
   font-size: 10px;
 }
 
-.venue-link {
+.venue-link, .popup-link {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  color: var(--chalk-500);
   font-size: 12px;
   text-decoration: none;
 }
 
-.venue-link svg { width: 12px; height: 12px; }
+.venue-link svg, .popup-link svg { width: 12px; height: 12px; }
 
+.venue-link { color: var(--chalk-500); }
 .venue-link:hover { color: var(--floodlight-300); }
 
 /* ---------- skeleton loading ---------- */
 
 .venue-card.skeleton { cursor: default; }
-.venue-card.skeleton:hover { transform: none; box-shadow: none; border-color: rgba(244, 247, 241, 0.06); }
+.venue-card.skeleton:hover { transform: none; box-shadow: none; border-color: var(--line); }
 
 .shimmer-bar, .shimmer-chip, .venue-swatch.shimmer {
   background: linear-gradient(90deg, var(--field-650) 25%, var(--field-800) 50%, var(--field-650) 75%);
@@ -625,13 +617,12 @@ select:focus {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: transform 0.15s, box-shadow 0.15s;
+  transition: box-shadow 0.15s;
 }
 
-.venue-marker svg { width: 14px; height: 14px; color: #201400; }
+.venue-marker svg { width: 14px; height: 14px; color: var(--on-amber); }
 
 .venue-marker.active {
-  transform: scale(1.18);
   box-shadow: 0 0 0 6px rgba(245, 166, 35, 0.32), 0 6px 14px rgba(3, 15, 8, 0.6);
 }
 
@@ -676,16 +667,9 @@ select:focus {
 }
 
 .popup-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
   margin-top: 6px;
   color: var(--floodlight-300);
-  font-size: 12px;
-  text-decoration: none;
 }
-
-.popup-link svg { width: 12px; height: 12px; }
 
 /* ---------- responsive ---------- */
 
@@ -694,15 +678,14 @@ select:focus {
   .filters { margin: 0 16px 12px; padding: 12px; }
   .filter-group { border-inline-end: none; padding-inline-end: 0; width: 100%; }
   .search-btn { width: 100%; margin-inline-start: 0; }
-  .status { margin: 0 16px 10px; }
+  .status { margin: 0 16px 10px; flex-wrap: wrap; }
   .pitch-divider { margin: 0 16px 12px; }
   .results { margin: 0 16px 16px; flex-direction: column; }
   .list {
     width: 100%;
     max-height: 42vh;
     border-inline-start: none;
-    border-top: 1px solid rgba(244, 247, 241, 0.06);
+    border-top: 1px solid var(--line);
   }
-  .status { flex-wrap: wrap; }
   .date-popover { width: min(280px, calc(100vw - 64px)); }
 }

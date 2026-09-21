@@ -16,6 +16,15 @@ const SLOTS_PER_DAY = 48; // 30-minute slots: 0 = 00:00 … 47 = 23:30
 // corrupted coordinates (or venues from other cities leaking into a
 // state-scoped query); such points would blow up the map's auto-fit zoom.
 const IRAN_BBOX = { minLat: 24, maxLat: 40, minLng: 44, maxLng: 64 };
+// Intl formatters are costly to construct; the calendar alone would build ~60 per render.
+// `en-US` keeps digits ASCII so formatToParts is trivial to read; "u-ca-persian" does the calendar conversion.
+const JALALI_DATE_FORMAT = new Intl.DateTimeFormat("en-US-u-ca-persian", {
+  year: "numeric",
+  month: "numeric",
+  day: "numeric",
+});
+const FA_NUMBER = new Intl.NumberFormat("fa-IR");
+const FA_YEAR = new Intl.NumberFormat("fa-IR", { useGrouping: false });
 
 maplibregl.setRTLTextPlugin(
   "https://cdn.jsdelivr.net/npm/@mapbox/mapbox-gl-rtl-text@0.2.3/mapbox-gl-rtl-text.min.js",
@@ -58,10 +67,8 @@ const map = new maplibregl.Map({
 map.addControl(new maplibregl.NavigationControl(), "top-left");
 
 let markers = [];
-let activeCardId = null;
 let selectedDate = null;
-let calViewJY = null;
-let calViewJM = null;
+let calMonth = null; // month shown in the calendar popover: jalaliYear * 12 + (jalaliMonth - 1)
 let userCoords = null; // origin for distance sort: GPS fix or a spot picked on the map
 let locationSource = null; // "gps" | "picked" | null
 let originMarker = null;
@@ -74,15 +81,37 @@ let lastVenues = [];
 let lastTargetDate = null;
 
 function setStatus(message, kind) {
-  if (!message) {
-    els.status.hidden = true;
-    els.statusText.textContent = "";
-    els.status.classList.remove("error");
-    return;
-  }
-  els.status.hidden = false;
-  els.statusText.textContent = message;
-  els.status.classList.toggle("error", kind === "error");
+  els.status.hidden = !message;
+  els.statusText.textContent = message || "";
+  els.status.classList.toggle("error", Boolean(message) && kind === "error");
+}
+
+// API strings are untrusted and end up in innerHTML / Popup.setHTML, so every
+// interpolation of one goes through esc(); hrefs also go through safeUrl().
+function esc(value) {
+  return String(value ?? "").replace(
+    /[&<>"']/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]
+  );
+}
+
+function safeUrl(url) {
+  return /^https?:\/\//i.test(url) ? url : "#";
+}
+
+function iconElement(className, iconId) {
+  const el = document.createElement("div");
+  el.className = className;
+  el.innerHTML = `<svg><use href="#${iconId}"/></svg>`;
+  return el;
+}
+
+function externalLinkHTML(className, url) {
+  return `
+    <a class="${className}" href="${esc(safeUrl(url))}" target="_blank" rel="noopener">
+      <svg><use href="#icon-external"/></svg>
+      مشاهده در آسان اسپرت
+    </a>`;
 }
 
 function statePanelHTML(iconId, message, { retry } = {}) {
@@ -112,10 +141,8 @@ function renderSkeleton(count) {
 }
 
 // Site's weekday order is شنبه..جمعه (Saturday-first); JS Date#getDay() is Sunday-first (0-6).
-function apiDayIndex(dateStr) {
-  const [y, m, d] = dateStr.split("-").map(Number);
-  const jsDay = new Date(y, m - 1, d).getDay(); // 0=Sun..6=Sat
-  return (jsDay + 1) % 7; // 0=Sat..6=Fri
+function apiDayIndex(date) {
+  return (date.getDay() + 1) % 7; // getDay: 0=Sun..6=Sat -> 0=Sat..6=Fri
 }
 
 function toDateStr(d) {
@@ -125,8 +152,26 @@ function toDateStr(d) {
   return `${y}-${m}-${day}`;
 }
 
+// Inverse of toDateStr: local midnight of a YYYY-MM-DD string.
+function parseDateStr(dateStr) {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function addDays(date, n) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + n);
+  return d;
+}
+
+// Earliest and latest dates the picker allows, as YYYY-MM-DD strings.
+function bookableRange() {
+  const today = new Date();
+  return [toDateStr(today), toDateStr(addDays(today, MAX_DAYS_AHEAD))];
+}
+
 function toman(n) {
-  return n.toLocaleString("fa-IR") + " تومان";
+  return FA_NUMBER.format(n) + " تومان";
 }
 
 function timeOf(datetimeStr) {
@@ -136,7 +181,7 @@ function timeOf(datetimeStr) {
 // Wrapped in an LTR span so "21:00–22:30" doesn't get visually reordered
 // by the bidi algorithm inside the surrounding RTL page.
 function timeRange(session) {
-  return `<span dir="ltr">${timeOf(session.start)}–${timeOf(session.end)}</span>`;
+  return `<span dir="ltr">${esc(timeOf(session.start))}–${esc(timeOf(session.end))}</span>`;
 }
 
 function isWithinIran(lat, lng) {
@@ -178,30 +223,23 @@ function requestUserLocation() {
 
 function timeOptionsHTML() {
   let html = "";
-  for (let h = 0; h < 24; h++) {
-    for (let m = 0; m < 60; m += 30) {
-      const v = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-      html += `<option value="${v}">${v}</option>`;
-    }
+  for (let slot = 0; slot < SLOTS_PER_DAY; slot++) {
+    const v = slotToTime(slot);
+    html += `<option value="${v}">${v}</option>`;
   }
   return html;
 }
 
 // The API and all date arithmetic stay in Gregorian; only the calendar UI is
-// relabeled to Jalali (Shamsi). `en-US` keeps digits ASCII so formatToParts
-// is trivial to read; "u-ca-persian" is what actually converts the calendar.
+// relabeled to Jalali (Shamsi).
 function jalaliPartsOf(date) {
-  const parts = new Intl.DateTimeFormat("en-US-u-ca-persian", {
-    year: "numeric",
-    month: "numeric",
-    day: "numeric",
-  }).formatToParts(date);
+  const parts = JALALI_DATE_FORMAT.formatToParts(date);
   const get = (type) => Number(parts.find((p) => p.type === type).value);
   return { jy: get("year"), jm: get("month"), jd: get("day") };
 }
 
 // Scans a window of Gregorian dates around an estimate of the target Jalali
-// month and keeps whichever ones actually fall in it, sorted by day. This
+// month and keeps whichever ones actually fall in it, in day order. This
 // sidesteps hand-rolling Jalali leap-year rules — the browser's ICU data
 // already knows them via jalaliPartsOf.
 function jalaliMonthDays(jy, jm) {
@@ -209,46 +247,36 @@ function jalaliMonthDays(jy, jm) {
   seed.setDate(seed.getDate() + Math.round((jm - 1) * 30.44));
   const found = [];
   for (let offset = -20; offset <= 40; offset++) {
-    const d = new Date(seed);
-    d.setDate(seed.getDate() + offset);
-    const parts = jalaliPartsOf(d);
-    if (parts.jy === jy && parts.jm === jm) found.push({ jd: parts.jd, date: d });
+    const date = addDays(seed, offset);
+    const parts = jalaliPartsOf(date);
+    if (parts.jy === jy && parts.jm === jm) found.push({ jd: parts.jd, date });
+    else if (found.length) break; // walked past the end of the month
   }
-  found.sort((a, b) => a.jd - b.jd);
   return found;
 }
 
-function maxSelectableDate() {
-  const d = new Date();
-  d.setDate(d.getDate() + MAX_DAYS_AHEAD);
-  return d;
-}
-
 function updateDateTriggerLabel() {
-  const [y, m, d] = selectedDate.split("-").map(Number);
-  const todayStr = toDateStr(new Date());
-  const tomorrowStr = toDateStr(new Date(new Date().setDate(new Date().getDate() + 1)));
+  const date = parseDateStr(selectedDate);
   const prefix =
-    selectedDate === todayStr
+    selectedDate === toDateStr(new Date())
       ? "امروز"
-      : selectedDate === tomorrowStr
+      : selectedDate === toDateStr(addDays(new Date(), 1))
         ? "فردا"
-        : DAY_NAMES[apiDayIndex(selectedDate)];
-  const { jm, jd } = jalaliPartsOf(new Date(y, m - 1, d));
-  els.dateTriggerLabel.textContent = `${prefix}، ${jd.toLocaleString("fa-IR")} ${JALALI_MONTHS[jm - 1]}`;
+        : DAY_NAMES[apiDayIndex(date)];
+  const { jm, jd } = jalaliPartsOf(date);
+  els.dateTriggerLabel.textContent = `${prefix}، ${FA_NUMBER.format(jd)} ${JALALI_MONTHS[jm - 1]}`;
 }
 
 function renderCalendar() {
-  const days = jalaliMonthDays(calViewJY, calViewJM);
-  els.calMonthLabel.textContent = `${JALALI_MONTHS[calViewJM - 1]} ${calViewJY.toLocaleString("fa-IR", { useGrouping: false })}`;
+  const jy = Math.floor(calMonth / 12);
+  const jm = (calMonth % 12) + 1;
+  const days = jalaliMonthDays(jy, jm);
+  els.calMonthLabel.textContent = `${JALALI_MONTHS[jm - 1]} ${FA_YEAR.format(jy)}`;
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const maxDate = maxSelectableDate();
-
+  const [todayStr, maxStr] = bookableRange();
   const firstDate = days[0].date;
   const lastDate = days[days.length - 1].date;
-  const leadingEmpty = apiDayIndex(toDateStr(firstDate));
+  const leadingEmpty = apiDayIndex(firstDate);
 
   let html = "";
   for (let i = 0; i < leadingEmpty; i++) {
@@ -256,28 +284,21 @@ function renderCalendar() {
   }
   for (const { jd, date } of days) {
     const dateStr = toDateStr(date);
-    const disabled = date < today || date > maxDate;
+    const disabled = dateStr < todayStr || dateStr > maxStr;
     const classes = ["cal-day"];
-    if (dateStr === toDateStr(today)) classes.push("today");
+    if (dateStr === todayStr) classes.push("today");
     if (dateStr === selectedDate) classes.push("selected");
-    html += `<button type="button" class="${classes.join(" ")}" data-date="${dateStr}"${disabled ? " disabled" : ""}>${jd.toLocaleString("fa-IR")}</button>`;
+    html += `<button type="button" class="${classes.join(" ")}" data-date="${dateStr}"${disabled ? " disabled" : ""}>${FA_NUMBER.format(jd)}</button>`;
   }
   els.calGrid.innerHTML = html;
 
-  const prevMonthLast = new Date(firstDate);
-  prevMonthLast.setDate(prevMonthLast.getDate() - 1);
-  els.calPrev.disabled = prevMonthLast < today;
-
-  const nextMonthFirst = new Date(lastDate);
-  nextMonthFirst.setDate(nextMonthFirst.getDate() + 1);
-  els.calNext.disabled = nextMonthFirst > maxDate;
+  els.calPrev.disabled = toDateStr(addDays(firstDate, -1)) < todayStr;
+  els.calNext.disabled = toDateStr(addDays(lastDate, 1)) > maxStr;
 }
 
 function openDatePopover() {
-  const [y, m, d] = selectedDate.split("-").map(Number);
-  const { jy, jm } = jalaliPartsOf(new Date(y, m - 1, d));
-  calViewJY = jy;
-  calViewJM = jm;
+  const { jy, jm } = jalaliPartsOf(parseDateStr(selectedDate));
+  calMonth = jy * 12 + jm - 1;
   renderCalendar();
   els.datePopover.hidden = false;
   els.dateTrigger.setAttribute("aria-expanded", "true");
@@ -310,13 +331,13 @@ async function loadFilterOptions() {
   );
 
   els.state.innerHTML = states
-    .map((s) => `<option value="${s.id}">${s.name}</option>`)
+    .map((s) => `<option value="${esc(s.id)}">${esc(s.name)}</option>`)
     .join("");
   const tehran = states.find((s) => s.name === "تهران");
   if (tehran) els.state.value = tehran.id;
 
   els.category.innerHTML = categories
-    .map((c) => `<option value="${c.name}" data-id="${c.id}">${c.name}</option>`)
+    .map((c) => `<option value="${esc(c.name)}" data-id="${esc(c.id)}">${esc(c.name)}</option>`)
     .join("");
   const multiPurpose = categories.find((c) => c.name === "سالن چند منظوره");
   if (multiPurpose) els.category.value = multiPurpose.name;
@@ -345,11 +366,7 @@ async function loadDistricts() {
 }
 
 async function fetchAllFreeSessions({ category, stateId, district, day, fromTime, toTime }) {
-  const results = [];
-  let page = 1;
-  let lastPage = 1;
-
-  do {
+  const fetchPage = async (page) => {
     const params = new URLSearchParams({
       category,
       state: stateId,
@@ -363,13 +380,16 @@ async function fetchAllFreeSessions({ category, stateId, district, day, fromTime
 
     const res = await fetch(`${API_BASE}/free-sessions?${params.toString()}`);
     if (!res.ok) throw new Error(`API returned ${res.status}`);
-    const json = await res.json();
-    results.push(...json.data);
-    lastPage = json.meta ? json.meta.last_page : 1;
-    page += 1;
-  } while (page <= lastPage && page <= MAX_PAGES);
+    return res.json();
+  };
 
-  return results;
+  // Page 1 says how many pages there are; the rest can then go out together.
+  const first = await fetchPage(1);
+  const lastPage = Math.min(first.meta ? first.meta.last_page : 1, MAX_PAGES);
+  const rest = await Promise.all(
+    Array.from({ length: lastPage - 1 }, (_, i) => fetchPage(i + 2))
+  );
+  return [first, ...rest].flatMap((json) => json.data);
 }
 
 function clearMarkers() {
@@ -377,20 +397,15 @@ function clearMarkers() {
   markers = [];
 }
 
-function createMarkerElement() {
-  const el = document.createElement("div");
-  el.className = "venue-marker";
-  el.innerHTML = '<svg><use href="#icon-ball"/></svg>';
-  return el;
-}
-
-function renderResults(venues, targetDate, { distanceFrom, fitMap = true } = {}) {
+// Renders lastVenues for lastTargetDate, sorted by distance when that mode is on.
+function renderResults({ fitMap }) {
   clearMarkers();
   els.list.innerHTML = "";
 
+  const distanceFrom = sortByDistanceActive ? userCoords : null;
   const entries = [];
-  for (const venue of venues) {
-    const sessions = venue.sessions.filter((s) => dateOf(s.start) === targetDate);
+  for (const venue of lastVenues) {
+    const sessions = venue.sessions.filter((s) => dateOf(s.start) === lastTargetDate);
     if (sessions.length === 0) continue;
     if (!isWithinIran(venue.latitude, venue.longitude)) continue; // bad/foreign coordinates from the source API
 
@@ -411,18 +426,15 @@ function renderResults(venues, targetDate, { distanceFrom, fitMap = true } = {})
     bounds.extend(lngLat);
 
     const popupHtml = `
-      <div class="popup-title">${venue.name}</div>
+      <div class="popup-title">${esc(venue.name)}</div>
       <div class="popup-sessions">
         ${sessions
           .map((s) => `<div>${timeRange(s)} · ${toman(s.price)}</div>`)
           .join("")}
       </div>
-      <a class="popup-link" href="${venue.url}" target="_blank" rel="noopener">
-        <svg><use href="#icon-external"/></svg>
-        مشاهده در آسان اسپرت
-      </a>`;
+      ${externalLinkHTML("popup-link", venue.url)}`;
 
-    const markerEl = createMarkerElement();
+    const markerEl = iconElement("venue-marker", "icon-ball");
     const marker = new maplibregl.Marker({ element: markerEl })
       .setLngLat(lngLat)
       .setPopup(new maplibregl.Popup({ offset: 20 }).setHTML(popupHtml))
@@ -438,10 +450,10 @@ function renderResults(venues, targetDate, { distanceFrom, fitMap = true } = {})
       <div class="venue-card-head">
         <span class="venue-swatch"><svg><use href="#icon-ball"/></svg></span>
         <div class="venue-card-title">
-          <p class="name">${venue.name}</p>
+          <p class="name">${esc(venue.name)}</p>
           <div class="venue-meta">
-            ${venue.district ? `<span class="tag">${venue.district}</span>` : ""}
-            <span class="rating"><svg><use href="#icon-star"/></svg>${venue.rating ?? "-"} (${venue.reviews_count})</span>
+            ${venue.district ? `<span class="tag">${esc(venue.district)}</span>` : ""}
+            <span class="rating"><svg><use href="#icon-star"/></svg>${esc(venue.rating ?? "-")} (${esc(venue.reviews_count)})</span>
             ${distance != null ? `<span class="tag">${distance.toFixed(1)} کیلومتر</span>` : ""}
           </div>
         </div>
@@ -454,13 +466,10 @@ function renderResults(venues, targetDate, { distanceFrom, fitMap = true } = {})
           )
           .join("")}
       </div>
-      <a class="venue-link" href="${venue.url}" target="_blank" rel="noopener">
-        <svg><use href="#icon-external"/></svg>
-        مشاهده در آسان اسپرت
-      </a>`;
+      ${externalLinkHTML("venue-link", venue.url)}`;
     card.addEventListener("click", (e) => {
       if (e.target.closest(".venue-link")) return;
-      selectVenue(venue.id, { flyTo: true, ensurePopup: true });
+      selectVenue(venue.id, { focusMap: true });
     });
     els.list.appendChild(card);
   }
@@ -477,13 +486,13 @@ function renderResults(venues, targetDate, { distanceFrom, fitMap = true } = {})
   return entries.length;
 }
 
-// `ensurePopup` opens the popup only if it isn't already open. Marker clicks
-// already toggle their own popup natively (maplibregl.Marker does this
-// internally once a popup is bound) — calling togglePopup() again here would
-// cancel that out, leaving the popup stuck in whatever state it started in.
-// Card clicks don't touch the marker directly, so they need to open it explicitly.
-function selectVenue(id, { flyTo = false, ensurePopup = false } = {}) {
-  activeCardId = id;
+// `focusMap` (card clicks) flies to the marker and opens its popup only if it
+// isn't already open. Marker clicks already toggle their own popup natively
+// (maplibregl.Marker does this internally once a popup is bound) — calling
+// togglePopup() again there would cancel that out, leaving the popup stuck in
+// whatever state it started in. Card clicks don't touch the marker directly,
+// so they need to open it explicitly.
+function selectVenue(id, { focusMap = false } = {}) {
   for (const card of els.list.querySelectorAll(".venue-card")) {
     card.classList.toggle("active", card.dataset.id === String(id));
   }
@@ -491,11 +500,9 @@ function selectVenue(id, { flyTo = false, ensurePopup = false } = {}) {
     m.el.classList.toggle("active", m.id === id);
   }
   const entry = markers.find((m) => m.id === id);
-  if (entry) {
-    if (ensurePopup && !entry.marker.getPopup().isOpen()) {
-      entry.marker.togglePopup();
-    }
-    if (flyTo) map.flyTo({ center: entry.marker.getLngLat(), zoom: 14 });
+  if (entry && focusMap) {
+    if (!entry.marker.getPopup().isOpen()) entry.marker.togglePopup();
+    map.flyTo({ center: entry.marker.getLngLat(), zoom: 14 });
   }
 }
 
@@ -512,6 +519,12 @@ function updateLocationUI() {
   els.pickLocationBtn.classList.toggle("active", pickMode);
   els.pickLocationBtn.setAttribute("aria-pressed", String(pickMode));
   els.clearLocationBtn.hidden = !userCoords;
+}
+
+// Re-renders the list and map for the current location/sort state. Returns the venue count.
+function refreshResults({ fitMap = false } = {}) {
+  updateLocationUI();
+  return renderResults({ fitMap });
 }
 
 function startPickMode(hint = PICK_HINT) {
@@ -540,10 +553,11 @@ function setOrigin(coords, source) {
   if (originMarker) {
     originMarker.setLngLat([coords.lng, coords.lat]);
   } else {
-    const el = document.createElement("div");
-    el.className = "origin-marker";
-    el.innerHTML = '<svg><use href="#icon-origin"/></svg>';
-    originMarker = new maplibregl.Marker({ element: el, anchor: "bottom", draggable: true })
+    originMarker = new maplibregl.Marker({
+      element: iconElement("origin-marker", "icon-origin"),
+      anchor: "bottom",
+      draggable: true,
+    })
       .setLngLat([coords.lng, coords.lat])
       .addTo(map);
     originMarker.on("dragend", () => {
@@ -553,8 +567,7 @@ function setOrigin(coords, source) {
   }
 
   sortByDistanceActive = true;
-  updateLocationUI();
-  renderResults(lastVenues, lastTargetDate, { distanceFrom: userCoords, fitMap: false });
+  refreshResults();
   syncUrl(["p"]);
 }
 
@@ -567,16 +580,14 @@ function clearLocation() {
   userCoords = null;
   locationSource = null;
   sortByDistanceActive = false;
-  updateLocationUI();
-  renderResults(lastVenues, lastTargetDate, { fitMap: false });
+  refreshResults();
   syncUrl(["p"]);
 }
 
 async function toggleSortByDistance() {
   if (sortByDistanceActive) {
     sortByDistanceActive = false;
-    updateLocationUI();
-    renderResults(lastVenues, lastTargetDate, { fitMap: false });
+    refreshResults();
     return;
   }
 
@@ -671,7 +682,8 @@ const URL_PARAMS = [
       const dateStr = `20${m[1]}-${m[2]}-${m[3]}`;
       // Round-trip catches impossible dates like 260231, which Date would roll into March.
       if (toDateStr(new Date(2000 + +m[1], +m[2] - 1, +m[3])) !== dateStr) return;
-      if (dateStr < toDateStr(new Date()) || dateStr > toDateStr(maxSelectableDate())) return;
+      const [minStr, maxStr] = bookableRange();
+      if (dateStr < minStr || dateStr > maxStr) return;
       selectedDate = dateStr;
       updateDateTriggerLabel();
     },
@@ -766,7 +778,7 @@ async function performSearch() {
 
   try {
     const dateStr = selectedDate;
-    const day = apiDayIndex(dateStr);
+    const day = apiDayIndex(parseDateStr(dateStr));
     const raw = await fetchAllFreeSessions({
       category: els.category.value,
       stateId: els.state.value,
@@ -779,9 +791,8 @@ async function performSearch() {
     lastVenues = raw;
     lastTargetDate = dateStr;
     sortByDistanceActive = false;
-    updateLocationUI();
 
-    const count = renderResults(raw, dateStr);
+    const count = refreshResults({ fitMap: true });
     setStatus(`${DAY_NAMES[day]} ${dateStr} · ${count} مجموعه در این تاریخ سانس خالی دارند`);
     els.locationActions.hidden = count === 0;
     // A pin restored from the URL has coordinates but no marker yet.
@@ -805,9 +816,10 @@ function handleSearch(event) {
 }
 
 function init() {
-  els.fromTime.innerHTML = timeOptionsHTML();
+  const timeOptions = timeOptionsHTML();
+  els.fromTime.innerHTML = timeOptions;
   els.fromTime.value = DEFAULT_FROM;
-  els.toTime.innerHTML = timeOptionsHTML();
+  els.toTime.innerHTML = timeOptions;
   els.toTime.value = DEFAULT_TO;
 
   selectedDate = toDateStr(new Date());
@@ -821,9 +833,7 @@ function init() {
   els.datePopover.addEventListener("click", (e) => {
     const quick = e.target.closest(".quick-chip");
     if (quick) {
-      const d = new Date();
-      d.setDate(d.getDate() + Number(quick.dataset.offset));
-      pickDate(toDateStr(d));
+      pickDate(toDateStr(addDays(new Date(), Number(quick.dataset.offset))));
       return;
     }
     const day = e.target.closest(".cal-day");
@@ -833,20 +843,12 @@ function init() {
   });
 
   els.calPrev.addEventListener("click", () => {
-    calViewJM -= 1;
-    if (calViewJM < 1) {
-      calViewJM = 12;
-      calViewJY -= 1;
-    }
+    calMonth -= 1;
     renderCalendar();
   });
 
   els.calNext.addEventListener("click", () => {
-    calViewJM += 1;
-    if (calViewJM > 12) {
-      calViewJM = 1;
-      calViewJY += 1;
-    }
+    calMonth += 1;
     renderCalendar();
   });
 
