@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>جستجوی سانس خالی سالن‌های ورزشی</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl/dist/maplibre-gl.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <h1>سانس خالی سالن‌های ورزشی</h1>
+    <p class="subtitle">روی نقشه، فقط مجموعه‌هایی که سانس خالی مطابق فیلتر شما دارند نشان داده می‌شود</p>
+  </header>
+
+  <form id="filters" class="filters">
+    <div class="field">
+      <label for="category">نوع مجموعه</label>
+      <select id="category" required></select>
+    </div>
+    <div class="field">
+      <label for="state">شهر</label>
+      <select id="state" required></select>
+    </div>
+    <div class="field">
+      <label for="district">منطقه</label>
+      <select id="district">
+        <option value="">همه مناطق</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="date">تاریخ</label>
+      <input type="date" id="date" required>
+    </div>
+    <div class="field">
+      <label for="fromTime">از ساعت</label>
+      <input type="time" id="fromTime" value="08:00" required>
+    </div>
+    <div class="field">
+      <label for="toTime">تا ساعت</label>
+      <input type="time" id="toTime" value="23:00" required>
+    </div>
+    <button type="submit" id="searchBtn">جستجو</button>
+  </form>
+
+  <div id="status" class="status" hidden></div>
+
+  <main class="results">
+    <div id="map"></div>
+    <aside id="list" class="list">
+      <p class="list-empty">برای دیدن نتایج، فیلترها را تنظیم و جستجو کنید.</p>
+    </aside>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl/dist/maplibre-gl.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
