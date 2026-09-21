@@ -13,9 +13,11 @@ const DEFAULT_FROM = "08:00";
 const DEFAULT_TO = "23:00";
 const SLOTS_PER_DAY = 48; // 30-minute slots: 0 = 00:00 … 47 = 23:30
 // Loose bounding box around Iran. The API occasionally returns venues with
-// corrupted coordinates (or venues from other cities leaking into a
-// state-scoped query); such points would blow up the map's auto-fit zoom.
+// corrupted coordinates (e.g. lat 55, lng 65), which are dropped outright.
 const IRAN_BBOX = { minLat: 24, maxLat: 40, minLng: 44, maxLng: 64 };
+const FIT_OPTIONS = { padding: 60, maxZoom: 14 }; // how the map frames search results
+const STRAY_MIN_KM = 50; // see mainClusterBounds
+const STRAY_FACTOR = 5;
 // Intl formatters are costly to construct; the calendar alone would build ~60 per render.
 // `en-US` keeps digits ASCII so formatToParts is trivial to read; "u-ca-persian" does the calendar conversion.
 const JALALI_DATE_FORMAT = new Intl.DateTimeFormat("en-US-u-ca-persian", {
@@ -79,6 +81,7 @@ let urlDefaults = { category: null, state: null }; // form values after option l
 let copyLinkTimer = null;
 let lastVenues = [];
 let lastTargetDate = null;
+let hasFittedResults = false; // the map has framed a set of results at least once
 
 function setStatus(message, kind) {
   els.status.hidden = !message;
@@ -419,11 +422,8 @@ function renderResults({ fitMap }) {
     entries.sort((a, b) => a.distance - b.distance);
   }
 
-  const bounds = new maplibregl.LngLatBounds();
-
   for (const { venue, sessions, distance } of entries) {
     const lngLat = [venue.longitude, venue.latitude];
-    bounds.extend(lngLat);
 
     const popupHtml = `
       <div class="popup-title">${esc(venue.name)}</div>
@@ -479,11 +479,53 @@ function renderResults({ fitMap }) {
       "icon-ball",
       "هیچ سالنی با این فیلتر، سانس خالی ندارد."
     );
-  } else if (fitMap && !bounds.isEmpty()) {
-    map.fitBounds(bounds, { padding: 60, maxZoom: 14 });
+  } else if (fitMap) {
+    fitMapToResults(entries);
   }
 
   return entries.length;
+}
+
+function median(values) {
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = sorted.length >> 1;
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+// Bounds of the venues around the middle of the results, leaving out far-off
+// strays. The source API sometimes lists a venue from another city under the
+// searched state (a Kerman hall under Tehran, with valid coordinates and
+// `state` still saying Tehran); framing it would zoom the map out to half the
+// country. A stray is one further out than STRAY_MIN_KM and STRAY_FACTOR times
+// the typical (median) distance from the centre. Its marker is still drawn.
+function mainClusterBounds(entries) {
+  const centre = {
+    lat: median(entries.map((e) => e.venue.latitude)),
+    lng: median(entries.map((e) => e.venue.longitude)),
+  };
+  const distances = entries.map((e) =>
+    distanceKm(centre.lat, centre.lng, e.venue.latitude, e.venue.longitude)
+  );
+  const limit = Math.max(STRAY_MIN_KM, STRAY_FACTOR * median(distances));
+  const bounds = new maplibregl.LngLatBounds();
+  entries.forEach(({ venue }, i) => {
+    if (distances[i] <= limit) bounds.extend([venue.longitude, venue.latitude]);
+  });
+  return bounds;
+}
+
+// Frames the results: always on the first search; on later ones the map is left
+// alone unless that would zoom it out from a view that still shows results, so
+// changing a filter never pulls out a map the user has zoomed in on. If no result
+// is on screen any more (e.g. another city) it re-frames.
+function fitMapToResults(entries) {
+  const bounds = mainClusterBounds(entries);
+  const camera = map.cameraForBounds(bounds, FIT_OPTIONS);
+  const viewport = map.getBounds();
+  const resultInView = markers.some(({ marker }) => viewport.contains(marker.getLngLat()));
+  if (hasFittedResults && resultInView && camera && camera.zoom < map.getZoom()) return;
+  map.fitBounds(bounds, FIT_OPTIONS);
+  hasFittedResults = true;
 }
 
 // `focusMap` (card clicks) flies to the marker and opens its popup only if it
