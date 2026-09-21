@@ -1,0 +1,20 @@
+# secrets / local config
+.env
+.env.*
+
+# dependencies
+node_modules/
+
+# editors
+.vscode/
+.idea/
+*.swp
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# logs / scratch
+*.log
+.playwright-mcp/
