@@ -18,7 +18,7 @@ const SLOTS_PER_DAY = 48; // 30-minute slots: 0 = 00:00 … 47 = 23:30
 const IRAN_BBOX = { minLat: 24, maxLat: 40, minLng: 44, maxLng: 64 };
 
 maplibregl.setRTLTextPlugin(
-  "https://cdn.jsdelivr.net/npm/@mapbox/mapbox-gl-rtl-text/mapbox-gl-rtl-text.min.js",
+  "https://cdn.jsdelivr.net/npm/@mapbox/mapbox-gl-rtl-text@0.2.3/mapbox-gl-rtl-text.min.js",
   null,
   true
 );
