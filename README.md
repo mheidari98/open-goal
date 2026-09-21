@@ -1,8 +1,10 @@
-# sans-khali
+# Open Goal
 
 Find free sports-hall sessions ("سانس خالی") on a map. Pick a city, date and time window and see which futsal halls and turf pitches have an open slot.
 
-**Live demo: https://mheidari98.github.io/sans-khali/**
+The name: an open goal is an easy chance, and Persian uses the same word, "خالی" (empty/free), for both "سانس خالی" and "دروازه خالی".
+
+**Live demo: https://mheidari98.github.io/open-goal/**
 
 ![Screenshot: venues with free sessions on a map of Tehran, with the filter bar and result list](docs/screenshot.png)
 
@@ -58,7 +60,7 @@ Session data comes from the public API behind [asansports.com](https://asansport
 
 ## فارسی
 
-**سانس خالی سالن‌های ورزشی**: صفحه‌ای ساده که سانس‌های خالی سالن‌های چندمنظوره (فوتسال) و زمین‌های چمن را روی نقشه نشان می‌دهد.
+**Open Goal (سانس خالی سالن‌های ورزشی)**: صفحه‌ای ساده که سانس‌های خالی سالن‌های چندمنظوره (فوتسال) و زمین‌های چمن را روی نقشه نشان می‌دهد.
 
 - شهر، منطقه، تاریخ (با تقویم شمسی) و بازهٔ ساعت را انتخاب کنید و فقط سالن‌هایی را ببینید که در آن زمان سانس خالی دارند.
 - نتایج را بر اساس فاصله از موقعیت خودتان یا نقطه‌ای که روی نقشه انتخاب می‌کنید مرتب کنید.
